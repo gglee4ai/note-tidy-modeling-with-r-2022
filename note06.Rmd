@@ -1,0 +1,377 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidymodels)
+library(rules)
+```
+
+```{r}
+cubist_rules_Cubist_spec <-
+  cubist_rules(committees = tune(), neighbors = tune(), max_rules = tune()) %>%
+  set_engine("Cubist")
+```
+
+```{r}
+data(ames)
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+```
+
+```{r}
+set.seed(502)
+ames_split <- initial_split(ames, prop = 0.8, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+```
+
+```{r}
+lm_model <- linear_reg() %>%
+  set_engine("lm")
+```
+
+```{r}
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model)
+lm_wflow
+```
+
+```{r}
+lm_wflow <-
+  lm_wflow %>%
+  add_formula(Sale_Price ~ Longitude + Latitude)
+lm_wflow
+```
+
+```{r}
+lm_fit <- fit(lm_wflow, ames_train)
+lm_fit
+```
+
+```{r}
+predict(lm_fit, ames_test %>% slice(1:3))
+```
+
+```{r}
+lm_fit %>% update_formula(Sale_Price ~ Longitude)
+```
+
+```{r}
+lm_wflow <-
+  lm_wflow %>%
+  remove_formula() %>%
+  remove_variables() %>%
+  add_variables(outcome = Sale_Price, predictors = c(Longitude, Latitude))
+# add_variables(outcome = Sale_Price, predictors = everything())
+lm_wflow
+```
+
+```{r}
+lm_wflow %>% fit(ames_train)
+```
+
+```{r}
+library(tidymodels)
+data(ames)
+
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(502)
+ames_split <- initial_split(ames, prop = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+
+lm_model <- linear_reg() %>% set_engine("lm")
+
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_variables(outcome = Sale_Price, predictors = c(Longitude, Latitude))
+
+lm_fit <- fit(lm_wflow, ames_train)
+lm_fit
+```
+
+```{r}
+ames_rec <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01, id = "my_id") %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+```
+
+```{r}
+tidy(ames_rec)
+```
+
+```{r}
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(ames_rec)
+
+lm_fit <- fit(lm_wflow, ames_train)
+```
+
+```{r}
+estimated_recipe <-
+  lm_fit %>%
+  extract_recipe(estimated = TRUE)
+
+tidy(estimated_recipe, id = "my_id")
+```
+
+```{r}
+library(tidymodels)
+data(ames)
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(502)
+ames_split <- initial_split(ames, prop = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+
+ames_rec <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+lm_model <- linear_reg() %>% set_engine("lm")
+
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(ames_rec)
+
+lm_fit <- fit(lm_wflow, ames_train)
+```
+
+```{r}
+lm_fit
+```
+
+```{r}
+ggplot(ames_test_res, aes(x = Sale_Price, y = .pred)) +
+  # Create a diagonal line:
+  geom_abline(lty = 2) +
+  geom_point(alpha = 0.5) +
+  labs(y = "Predicted Sale Price (log10)", x = "Sale Price (log10)") +
+  # Scale and size the x- and y-axis uniformly:
+  coord_obs_pred()
+```
+
+```{r}
+library(tidymodels)
+data(ames)
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(502)
+ames_split <- initial_split(ames, prop = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+
+ames_rec <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_")) %>%
+  step_ns(Latitude, Longitude, deg_free = 20)
+
+lm_model <- linear_reg() %>% set_engine("lm")
+
+lm_wflow <-
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(ames_rec)
+
+lm_fit <- fit(lm_wflow, ames_train)
+
+rf_model <-
+  rand_forest(trees = 1000) %>%
+  set_engine("ranger") %>%
+  set_mode("regression")
+
+rf_wflow <-
+  workflow() %>%
+  add_formula(
+    Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+      Latitude + Longitude
+  ) %>%
+  add_model(rf_model)
+```
+
+```{r}
+library(doMC)
+registerDoMC(cores = 5)
+set.seed(1001)
+ames_folds <- vfold_cv(ames_train, v = 10, repeats = 20)
+
+keep_pred <- control_resamples(save_pred = TRUE, save_workflow = TRUE)
+
+set.seed(1003)
+rf_res <- rf_wflow %>% fit_resamples(resamples = ames_folds, control = keep_pred)
+registerDoSEQ()
+```
+
+```{r}
+rf_res
+```
+
+```{r}
+install.packages("tidyposterior")
+install.packages("workflowsets")
+```
+
+```{r}
+library(tidymodels)
+library(doMC)
+library(tidyposterior)
+library(workflowsets)
+library(rstanarm)
+theme_set(theme_bw())
+
+data(ames, package = "modeldata")
+
+ames <- mutate(ames, Sale_Price = log10(Sale_Price))
+
+set.seed(123)
+ames_split <- initial_split(ames, prop = 0.80, strata = Sale_Price)
+ames_train <- training(ames_split)
+ames_test <- testing(ames_split)
+
+crs <- 5 # parallel::detectCores()
+
+registerDoMC(cores = crs)
+
+## -----------------------------------------------------------------------------
+
+set.seed(55)
+ames_folds <- vfold_cv(ames_train, v = 10, repeats = 10)
+
+lm_model <- linear_reg() %>% set_engine("lm")
+
+rf_model <-
+  rand_forest(trees = 1000) %>%
+  set_engine("ranger") %>%
+  set_mode("regression")
+
+# ------------------------------------------------------------------------------
+
+basic_rec <-
+  recipe(Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built + Bldg_Type +
+    Latitude + Longitude, data = ames_train) %>%
+  step_log(Gr_Liv_Area, base = 10) %>%
+  step_other(Neighborhood, threshold = 0.01) %>%
+  step_dummy(all_nominal_predictors())
+
+interaction_rec <-
+  basic_rec %>%
+  step_interact(~ Gr_Liv_Area:starts_with("Bldg_Type_"))
+
+spline_rec <-
+  interaction_rec %>%
+  step_ns(Latitude, Longitude, deg_free = 50)
+
+preproc <-
+  list(
+    basic = basic_rec,
+    interact = interaction_rec,
+    splines = spline_rec,
+    formula = Sale_Price ~ Neighborhood + Gr_Liv_Area + Year_Built +
+      Bldg_Type + Latitude + Longitude
+  )
+
+models <- list(lm = lm_model, lm = lm_model, lm = lm_model, rf = rf_model)
+
+four_models <-
+  workflow_set(preproc, models, cross = FALSE)
+four_models
+```
+
+```{r}
+posteriors <- NULL
+
+for (i in 11:100) {
+  if (i %% 10 == 0) cat(i, "... ")
+
+  tmp_rset <- rsample:::df_reconstruct(ames_folds %>% slice(1:i), ames_folds)
+
+  four_resamples <-
+    four_models %>%
+    workflow_map("fit_resamples", seed = 1, resamples = tmp_rset)
+
+  ## -----------------------------------------------------------------------------
+
+  # rsq_anova <-
+  #   perf_mod(
+  #     four_resamples,
+  #     prior_intercept = student_t(df = 1),
+  #     chains = crs - 2,
+  #     iter = 5000,
+  #     seed = 2,
+  #     cores = crs - 2,
+  #     refresh = 0
+  #   )
+  #
+  # rqs_diff <-
+  #   contrast_models(rsq_anova,
+  #                   list_1 = "splines_lm",
+  #                   list_2 = "basic_lm",
+  #                   seed = 3) %>%
+  #   as_tibble() %>%
+  #   mutate(label = paste(format(1:100)[i], "resamples"), resamples = i)
+  #
+  # posteriors <- bind_rows(posteriors, rqs_diff)zz
+  #
+  # rm(rqs_diff)
+}
+```
+
+```{r}
+## -----------------------------------------------------------------------------
+
+# ggplot(posteriors, aes(x = difference)) +
+#   geom_histogram(bins = 30) +
+#   facet_wrap(~label)
+#
+# ggplot(posteriors, aes(x = difference)) +
+#   geom_line(stat = "density", trim = FALSE) +
+#   facet_wrap(~label)
+
+intervals <-
+  posteriors %>%
+  group_by(resamples) %>%
+  summarize(
+    mean = mean(difference),
+    lower = quantile(difference, prob = 0.05),
+    upper = quantile(difference, prob = 0.95),
+    .groups = "drop"
+  ) %>%
+  ungroup() %>%
+  mutate(
+    mean = predict(loess(mean ~ resamples, span = .15)),
+    lower = predict(loess(lower ~ resamples, span = .15)),
+    upper = predict(loess(upper ~ resamples, span = .15))
+  )
+
+save(intervals, file = "RData/post_intervals.RData")
+
+# ggplot(intervals,
+#        aes(x = resamples, y = mean)) +
+#   geom_path() +
+#   geom_ribbon(aes(ymin = lower, ymax = upper), fill = "red", alpha = .1) +
+#   labs(y = expression(paste("Mean difference in ", R^2)),
+#        x = "Number of Resamples (repeated 10-fold cross-validation)")
+#
+```
