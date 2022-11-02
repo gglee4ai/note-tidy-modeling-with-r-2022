@@ -259,7 +259,7 @@ race_results
 ```{r}
 autoplot(
   race_results,
-  rank_metric = "rmse",≈
+  rank_metric = "rmse",
   metric = "rmse",
   select_best = TRUE
 ) +
